@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="tb6621" />
+		<Option pch_mode="2" />
+		<Option compiler="arm-elf-gcc" />
+		<Build>
+			<Target title="Release">
+				<Option output="bin/Release/tb6621" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj/Release/" />
+				<Option type="1" />
+				<Option compiler="arm-elf-gcc" />
+				<Linker>
+					<Add option="-s" />
+				</Linker>
+			</Target>
+		</Build>
+		<Compiler>
+			<Add option="-msoft-float" />
+			<Add option="-O1" />
+			<Add option="-Wall" />
+			<Add option="-std=c99" />
+			<Add option="-fcommon -mthumb" />
+			<Add option="-MD" />
+			<Add option="-ffunction-sections -fdata-sections" />
+			<Add option="-mcpu=cortex-m0" />
+			<Add option="-DSTM32F0" />
+			<Add directory="C:/libopencm3-master/include" />
+		</Compiler>
+		<Linker>
+			<Add option="-Wl,--start-group -lc -lm  -lnosys -Wl,--end-group" />
+			<Add option="-LC:/libopencm3-master/lib" />
+			<Add option="-lopencm3_stm32f0 --static" />
+			<Add option="-Tstm32f030.ld -nostartfiles" />
+			<Add option="-Wl,--gc-sections -mthumb -mcpu=cortex-m0 -msoft-float" />
+			<Add option="-Wl,-Map,map.txt" />
+		</Linker>
+		<ExtraCommands>
+			<Add after="arm-none-eabi-size $(TARGET_OUTPUT_FILE)" />
+			<Add after="arm-none-eabi-objcopy $(TARGET_OUTPUT_FILE) -O ihex $(TARGET_OUTPUT_DIR)$(TARGET_OUTPUT_BASENAME).hex" />
+			<Add after="arm-none-eabi-objcopy $(TARGET_OUTPUT_FILE) -Obinary $(TARGET_OUTPUT_DIR)$(TARGET_OUTPUT_BASENAME).bin" />
+		</ExtraCommands>
+		<Unit filename="tb6621.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="usart.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="usart.h" />
+		<Unit filename="wave.h" />
+		<Extensions>
+			<code_completion />
+			<envvars />
+			<debugger />
+			<lib_finder disable_auto="1" />
+		</Extensions>
+	</Project>
+</CodeBlocks_project_file>
