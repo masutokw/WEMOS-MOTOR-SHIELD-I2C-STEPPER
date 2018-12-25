@@ -11,25 +11,23 @@
 #include <stdlib.h>
 #include "usart.h"
 #include "wave.h"
+int32_t max_steps;
+uint32_t backslash;
+double step_size;
+uint32_t  speed;
+int32_t position;
+uint16_t delayt=500;
+int32_t  target,backcounter;
+uint32_t compare_time2;
+uint32_t new_time2;
+unsigned int ticks_x;
+//enum motor_state state;
+int pcounter;
+int32_t resolution;
 #define WA_P   gpio_set(GPIOA,GPIO0); gpio_clear(GPIOA,GPIO1);//set  V+ for A winding
 #define WA_N   gpio_clear(GPIOA,GPIO0); gpio_set(GPIOA,GPIO1); //set  V- for A winding
 #define WB_P   gpio_set(GPIOA,GPIO3); gpio_clear(GPIOA,GPIO4) //set  V+ for B winding
 #define WB_N   gpio_clear(GPIOA,GPIO3); gpio_set(GPIOA,GPIO4); //set  V- for B winding
-long int max_steps;
-long int backslash;
-double step_size;
-unsigned int speed;
-uint32_t position;
-long int delayt=500;
-long int target;
-long int backcounter;
-uint16_t compare_time2;
-uint16_t new_time2;
-unsigned int ticks_x;
-//enum motor_state state;
-int pcounter;
-
-short resolution;
 #define OWN_ADDRESS_1 0x32
 //Set Commands
 #define MYSLAVE_SET_REG 0x01
@@ -38,20 +36,21 @@ short resolution;
 #define MOTOR_SET_COUNT 0x03
 #define MOTOR_SET_TARGET 0x04
 #define MOTOR_GET_TARGET 0x05
-#define MOTOR_SET_SPEED 0x06
+#define MOTOR_SET_TICKS 0x06
+#define MOTOR_SET_DIR_RES 0x7
 
 volatile uint8_t reading;
 //volatile uint8_t *read_p;
 volatile uint8_t cmd;
 volatile uint8_t *write_p;
-volatile uint32_t *lpointer;
+volatile int32_t *lpointer;
 volatile uint8_t writing;
 volatile bool i2cread;
 uint8_t n;
 
 uint8_t buf[10];
 
-volatile uint32_t val;
+volatile int32_t val;
 void move_mstep(void);
 
 static void gpio_setup(void)
@@ -115,7 +114,7 @@ static void tim_setup(void)
                    TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
 
     /* Reset prescaler value. */
-    timer_set_prescaler(TIM2, 24);
+    timer_set_prescaler(TIM2, 1000);
     timer_disable_preload(TIM2);
     timer_continuous_mode(TIM2);
     timer_set_period(TIM2, 65535);
@@ -344,7 +343,7 @@ void i2c1_isr(void)
         {
             i2cread=true;
             reading = 0;
-            lpointer=(volatile uint32_t *)(buf);
+            lpointer=(volatile int32_t *)(buf);
             I2C1_ISR|=I2C_ISR_TXE;
         }
 
@@ -397,8 +396,11 @@ void i2c1_isr(void)
             case MOTOR_GET_TARGET:
                 val=target ;
                 break;
-            case MOTOR_SET_SPEED:
+            case MOTOR_SET_TICKS:
                 ticks_x=*lpointer;
+                break;
+                 case MOTOR_SET_DIR_RES:
+                resolution=*lpointer;
                 break;
             default:
                 break;
@@ -422,12 +424,12 @@ int main(void)
     i2c_setup();
     tim_setup();
     tim3_setup();
-    resolution=1;
+    resolution=-1;
     gpio_set(GPIOA,GPIO0);
     gpio_set(GPIOA,GPIO3);
     gpio_clear(GPIOA,GPIO1);
     gpio_clear(GPIOA,GPIO4);
-    ticks_x=10000;
+    ticks_x=65500;
     while (1)
     {
         for (i = 0; i < delayt; i++)
