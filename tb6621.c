@@ -12,12 +12,13 @@
 #include "usart.h"
 #include "wave.h"
 int32_t max_steps;
+volatile int32_t dir;
 uint32_t backslash;
 double step_size;
-uint32_t  speed;
-int32_t position;
-uint16_t delayt=500;
-int32_t  target,backcounter;
+volatile int32_t  speed;
+volatile int32_t position,target;
+uint16_t delayt=50;
+int32_t  backcounter;
 uint32_t compare_time2;
 uint32_t new_time2;
 unsigned int ticks_x;
@@ -52,7 +53,8 @@ uint8_t buf[10];
 
 volatile int32_t val;
 void move_mstep(void);
-
+inline int32_t sign(int32_t x) {
+    return (x > 0) - (x < 0);}
 static void gpio_setup(void)
 {
 
@@ -174,7 +176,7 @@ void tim2_isr(void)
         /* Calculate and set the next compare value. */
         new_time2 = compare_time2 + ticks_x;
         timer_set_oc_value(TIM2, TIM_OC1, new_time2);
-        move_mstep();
+       if (dir) move_mstep();
     }
 }
 static void tim3_setup(void)
@@ -207,15 +209,12 @@ void move_mstep(void)
 {
     uint8_t p, s, j;
     uint8_t  pwma, pwmb;
-    /*  if ((focus_aux.state == slew) && (focus_aux.position == focus_aux.target))
-      {
-          focus_aux.state = sync;
-          focus_aux.resolution = 0;
-          //  get_counter(&focus_aux);
-          trigg=&focus_aux;
+    if ((position == target)&&(dir!=0))
+      {    dir = 0;
+
       }
 
-
+/*
     #ifdef BACKSLASH_COMP
       if (resolution<0)
       {
@@ -234,8 +233,8 @@ void move_mstep(void)
       focus_aux.position += focus_aux.resolution;
     #endif // BACKSLASH_COMP
     */
-    position += resolution;
-    pcounter += resolution;
+    position += dir;
+    pcounter += dir;
 
     /*   if (bit_is_clear(PINF, PF0) &&  (focus_aux.resolution<0))
        {
@@ -397,7 +396,9 @@ void i2c1_isr(void)
                 val=target ;
                 break;
             case MOTOR_SET_TICKS:
-                ticks_x=*lpointer;
+                speed=*lpointer;
+                dir=sign(speed);//*resolution;
+                ticks_x=abs(speed);
                 break;
                  case MOTOR_SET_DIR_RES:
                 resolution=*lpointer;
@@ -424,12 +425,13 @@ int main(void)
     i2c_setup();
     tim_setup();
     tim3_setup();
-    resolution=-1;
+    resolution=1;
     gpio_set(GPIOA,GPIO0);
     gpio_set(GPIOA,GPIO3);
     gpio_clear(GPIOA,GPIO1);
     gpio_clear(GPIOA,GPIO4);
     ticks_x=65500;
+    dir=1;
     while (1)
     {
         for (i = 0; i < delayt; i++)
