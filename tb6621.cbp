@@ -27,9 +27,10 @@
 			<Add option="-mcpu=cortex-m0" />
 			<Add option="-DSTM32F0" />
 			<Add directory="C:/libopencm3-master/include" />
+			<Add directory="C:/Users/Angel/AppData/Local/arduino15/packages/arduino/tools/arm-none-eabi-gcc/4.8.3-2014q1/arm-none-eabi/include" />
 		</Compiler>
 		<Linker>
-			<Add option="-Wl,--start-group -lc -lm  -lnosys -Wl,--end-group" />
+			<Add option="-Wl,--start-group -lc -lm   -lnosys -Wl,--end-group" />
 			<Add option="-LC:/libopencm3-master/lib" />
 			<Add option="-lopencm3_stm32f0 --static" />
 			<Add option="-Tstm32f030.ld -nostartfiles" />
@@ -48,6 +49,9 @@
 			<Option compilerVar="CC" />
 		</Unit>
 		<Unit filename="usart.h" />
+		<Unit filename="wave.c">
+			<Option compilerVar="CC" />
+		</Unit>
 		<Unit filename="wave.h" />
 		<Extensions>
 			<code_completion />

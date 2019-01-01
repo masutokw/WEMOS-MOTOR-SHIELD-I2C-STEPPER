@@ -1,5 +1,3 @@
-
-
 #include <libopencm3/stm32/rcc.h>
 #include <libopencm3/stm32/gpio.h>
 #include <libopencm3/stm32/usart.h>
@@ -32,7 +30,7 @@ int32_t resolution;
 #define WB_N   gpio_clear(GPIOA,GPIO3); gpio_set(GPIOA,GPIO4); //set  V- for B winding
 #define OWN_ADDRESS_1 0x32
 //Set Commands
-#define MYSLAVE_SET_REG 0x01
+#define MYSLAVE_SET_REG 0x01h
 //GET commands
 #define MOTOR_GET_COUNT 0x02
 #define MOTOR_SET_COUNT 0x03
@@ -40,22 +38,26 @@ int32_t resolution;
 #define MOTOR_GET_TARGET 0x05
 #define MOTOR_SET_TICKS 0x06
 #define MOTOR_SET_DIR_RES 0x7
-
+#define MOTOR_SET_PRESCALER 0x8
+#define MOTOR_SET_WAVE_SCALE 0x9
+#define PRINT_WAVE 0x44
 volatile uint8_t reading;
 //volatile uint8_t *read_p;
 volatile uint8_t cmd;
 volatile uint8_t *write_p;
 volatile int32_t *lpointer;
 volatile uint8_t writing;
+volatile uint32_t tim2_prescaler=1000;
 volatile bool i2cread;
-uint8_t n;
-
+uint8_t slave= OWN_ADDRESS_1;
 uint8_t buf[10];
-
+bool bprint =false;
 volatile int32_t val;
 void move_mstep(void);
-inline int32_t sign(int32_t x) {
-    return (x > 0) - (x < 0);}
+inline int32_t sign(int32_t x)
+{
+    return (x > 0) - (x < 0);
+}
 static void gpio_setup(void)
 {
 
@@ -79,34 +81,29 @@ static void usart_setup(void)
     usart_set_baudrate(USART1, 9600);
     usart_set_databits(USART1, 8);
     usart_set_parity(USART1, USART_PARITY_NONE);
-    //usart_set_stopbits(USART1, USART_CR2_STOP_1_0BIT);
     usart_set_stopbits(USART1, USART_CR2_STOPBITS_1);
     usart_set_mode(USART1, USART_MODE_TX);
     usart_set_flow_control(USART1, USART_FLOWCONTROL_NONE);
-//   USART_CR1(USART1) |= USART_CR1_RXNEIE;
-
-    /* Finally enable the USART. */
     usart_enable(USART1);
 }
 
 static void clock_setup(void)
 {
     rcc_clock_setup_in_hsi_out_48mhz();
-    /* Enable GPIOC clock for LED & USARTs. */
+    // Enable clock for Timer3PWM.
     rcc_periph_clock_enable(RCC_TIM3);
-
-    /* Enable GPIOC, Alternate Function clocks. */
+    // Enable GPIOC,GPIOA Alternate Function clocks.
     rcc_periph_clock_enable(RCC_GPIOA);
     rcc_periph_clock_enable(RCC_GPIOB);
     //rcc_periph_clock_enable(RCC_GPIOC);
 
-    /* Enable clocks for USART2. */
+    // Enable clocks for USART1. Debug
     rcc_periph_clock_enable(RCC_USART1);
 
 }
 
 
-static void tim_setup(void)
+static void tim2_setup(void)
 {
 
     rcc_periph_clock_enable(RCC_TIM2);
@@ -117,7 +114,7 @@ static void tim_setup(void)
                    TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
 
     /* Reset prescaler value. */
-    timer_set_prescaler(TIM2, 1000);
+    timer_set_prescaler(TIM2, tim2_prescaler);
     timer_disable_preload(TIM2);
     timer_continuous_mode(TIM2);
     timer_set_period(TIM2, 65535);
@@ -155,14 +152,13 @@ static void i2c_setup(void)
     i2c_peripheral_disable(I2C1);
     i2c_enable_analog_filter(I2C1);
     i2c_set_digital_filter(I2C1, 0);
-    // HSI is at 48Mhz
+    // HSI is at 8Mhz
     i2c_set_speed(I2C1, i2c_speed_sm_100k,8);
     i2c_enable_stretching(I2C1);
     i2c_set_7bit_addr_mode(I2C1);
-    i2c_set_own_7bit_slave_address(I2C1, OWN_ADDRESS_1);
+    i2c_set_own_7bit_slave_address(I2C1,slave);
     //enable first slave addres by setting register, there is not enable function in libopencm3 .
     I2C1_OAR1|=I2C_OAR1_OA1EN_ENABLE;
-    // I2C1_CR1|=I2C_CR1_SBC;
     i2c_enable_interrupt(I2C1, I2C_CR1_ADDRIE|I2C_CR1_RXIE|I2C_CR1_TXIE|I2C_CR1_STOPIE|I2C_CR1_NACKIE);
     i2c_peripheral_enable(I2C1);
 
@@ -174,24 +170,21 @@ void tim2_isr(void)
     {
         timer_clear_flag(TIM2, TIM_SR_CC1IF);
         compare_time2 = timer_get_counter(TIM2);
-        /* Calculate and set the next compare value. */
+        // Calculate and set the next compare value.
         new_time2 = compare_time2 + ticks_x;
         timer_set_oc_value(TIM2, TIM_OC1, new_time2);
-       if (dir) move_mstep();
+        if (dir) move_mstep();
     }
 }
 static void tim3_setup(void)
 {
     TIM3_CR1 = TIM_CR1_CKD_CK_INT | TIM_CR1_CMS_EDGE;
-
     //TIM3_ARR = 65535;
     TIM3_ARR = 512;
-    /* Prescaler */
+    // Prescaler
     TIM3_PSC = 0;
     TIM3_EGR = TIM_EGR_UG;
-
-    /* ---- */
-    /* Output compare 1 mode and preload */
+  // Output compare 1 mode and preload */
     TIM3_CCMR1 |= TIM_CCMR1_OC1M_PWM1 | TIM_CCMR1_OC1PE;
     TIM3_CCER |= TIM_CCER_CC1E;
     TIM3_CCR1 = 0;
@@ -211,29 +204,30 @@ void move_mstep(void)
     uint8_t p, s, j;
     uint8_t  pwma, pwmb;
     if ((position == target)&&(dir!=0))
-      {    dir = 0;
+    {
+        dir = 0;
 
-      }
+    }
 
-/*
-    #ifdef BACKSLASH_COMP
-      if (resolution<0)
-      {
-          if (backcounter==0) position += resolution;
-          else backcounter+= resolution ;
-      }
-      else
-      {
-          if (backcounter==backslash)position += resolution;
-          else backcounter+= resolution ;
-      }
+    /*
+        #ifdef BACKSLASH_COMP
+          if (resolution<0)
+          {
+              if (backcounter==0) position += resolution;
+              else backcounter+= resolution ;
+          }
+          else
+          {
+              if (backcounter==backslash)position += resolution;
+              else backcounter+= resolution ;
+          }
 
 
-    #else
+        #else
 
-      focus_aux.position += focus_aux.resolution;
-    #endif // BACKSLASH_COMP
-    */
+          focus_aux.position += focus_aux.resolution;
+        #endif // BACKSLASH_COMP
+        */
     position += dir;
     pcounter += dir;
 
@@ -300,16 +294,11 @@ void serialParse(uint8_t* cad)
     {
     case 'i':
         resolution=atol((char*)cad);
-
         break;
     case 'd':
         ticks_x=atol((char*)cad);
-
         break;
-
-
     case 'p':
-
         USART_Put_Num(position);
         uartwrite("\r\n");
         break;
@@ -399,10 +388,21 @@ void i2c1_isr(void)
             case MOTOR_SET_TICKS:
                 speed=*lpointer;
                 dir=sign(speed);//*resolution;
-                ticks_x=abs(speed);
+                ticks_x=abs(speed)&0X0000FFFF;
                 break;
-                 case MOTOR_SET_DIR_RES:
-                resolution=*lpointer;
+            case MOTOR_SET_DIR_RES:
+                resolution=abs(*lpointer);
+                break;
+            case MOTOR_SET_PRESCALER:
+                tim2_prescaler=*lpointer;
+                timer_set_prescaler(TIM2, tim2_prescaler);
+                break;
+            case MOTOR_SET_WAVE_SCALE:
+                generate_wave(*lpointer);
+                break;
+            case PRINT_WAVE:
+                bprint=true;
+
                 break;
             default:
                 break;
@@ -420,11 +420,12 @@ int main(void)
 
 {
     int i;
+    generate_wave(24);
     clock_setup();
     gpio_setup();
     usart_setup();
     i2c_setup();
-    tim_setup();
+    tim2_setup();
     tim3_setup();
     resolution=1;
     gpio_set(GPIOA,GPIO0);
@@ -432,9 +433,23 @@ int main(void)
     gpio_clear(GPIOA,GPIO1);
     gpio_clear(GPIOA,GPIO4);
     ticks_x=65500;
-    dir=1;
+    dir=0;
+
     while (1)
     {
+      //debug table
+        if (bprint)
+        {
+            for (i=0 ; i<33; i++)
+            {
+
+                USART_Put_Num(i);
+                uartwrite("-");
+                USART_Put_Num(wave[i]);
+                uartwrite("\r\n");
+            }
+            bprint=false;
+        }
         for (i = 0; i < delayt; i++)
         {
             __asm__("NOP");
