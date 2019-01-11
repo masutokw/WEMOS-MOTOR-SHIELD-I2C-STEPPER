@@ -6,7 +6,7 @@
 #include <errno.h>
 #include "usart.h"
 //--- Set up USART1 with 9600bps 8N1 ---/
-#define BUFFER_LEN  50
+#define BUFFER_LEN  10
 uint8_t buffer[BUFFER_LEN]  ;
 uint8_t bidx=0;
 void (*parser )(uint8_t*)=NULL;
