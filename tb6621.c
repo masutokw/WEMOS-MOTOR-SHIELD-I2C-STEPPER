@@ -2,6 +2,7 @@
 #include <libopencm3/stm32/gpio.h>
 #include <libopencm3/stm32/usart.h>
 #include <libopencm3/stm32/timer.h>
+#include <libopencm3/cm3/systick.h>
 #include <libopencm3/stm32/i2c.h>
 #include <libopencm3/cm3/nvic.h>
 #include <libopencm3/stm32/exti.h>
@@ -10,6 +11,7 @@
 #include "tb6621.h"
 #include "usart.h"
 #include "wave.h"
+#include <math.h>
 int32_t max_steps;
 volatile int32_t dir;
 uint32_t backslash=0;
@@ -21,6 +23,7 @@ uint16_t delayt=50;
 uint32_t overticks_time2;
 uint32_t next_time2;
 unsigned int ticks_x;
+float fspeed,fspeedt;
 //enum motor_state state;
 int ustep_index;
 int32_t resolution;
@@ -28,7 +31,9 @@ volatile uint8_t reading;
 volatile uint8_t cmd;
 volatile uint8_t *write_p;
 volatile int32_t *lpointer;
+volatile float *fpointer;
 volatile uint32_t tim2_prescaler=1000;
+volatile uint32_t freq=MAIN_CLOCK/1000;
 volatile bool i2cread;
 uint8_t slave= OWN_ADDRESS_1;
 uint8_t buf[10];
@@ -51,6 +56,17 @@ static void gpio_setup(void)
     gpio_set_af(GPIOA, GPIO_AF1,GPIO2);
     gpio_set_af(GPIOA, GPIO_AF1,GPIO6|GPIO7);
 
+}
+
+static void systick_setup(int xms)
+{
+
+	systick_set_clocksource(STK_CSR_CLKSOURCE_EXT);
+	STK_CVR = 0;//set to 0
+
+	systick_set_reload(rcc_ahb_frequency / 8 / 1000 * xms);
+	systick_counter_enable();
+	systick_interrupt_enable();
 }
 
 static void usart_setup(void)
@@ -123,7 +139,8 @@ void tim2_isr(void)
         timer_clear_flag(TIM2, TIM_SR_CC1IF);
         overticks_time2 = timer_get_counter(TIM2);
         // Calculate and set the next compare value.
-        next_time2 = overticks_time2 + ticks_x;
+       // next_time2 = overticks_time2 + ticks_x;
+       next_time2 = overticks_time2 + ticks_x;
         timer_set_oc_value(TIM2, TIM_OC1, next_time2);
         if (dir) move_mstep();
     }
@@ -152,7 +169,10 @@ static void tim3_setup(void)
     TIM3_CR1 |= TIM_CR1_CEN;
 }
 
-
+void sys_tick_handler(void)
+{
+ __asm__("NOP");	;
+}
 void move_mstep(void)
 {
     uint8_t p, s, j;
@@ -277,6 +297,7 @@ void i2c1_isr(void)
             i2cread=true;
             reading = 0;
             lpointer=(volatile int32_t *)(buf);
+            fpointer=(volatile float_t *)(buf);
             I2C1_ISR|=I2C_ISR_TXE;
         }
 
@@ -339,10 +360,16 @@ void i2c1_isr(void)
             case MOTOR_SET_PRESCALER:
                 tim2_prescaler=*lpointer;
                 timer_set_prescaler(TIM2, tim2_prescaler);
+                freq=MAIN_CLOCK/tim2_prescaler;
                 break;
             case MOTOR_SET_WAVE_SCALE:
                 generate_wave(*lpointer);
                 break;
+            case MOTOR_SET_SPEED:
+                 fspeed=*fpointer;
+                  dir=sign(fspeed)*resolution;
+                  ticks_x=(int)(freq/abs(fspeed));
+                                   break;
             case PRINT_WAVE:
                 bprint=true;
 
@@ -368,6 +395,7 @@ int main(void)
     gpio_setup();
     usart_setup();
     i2c_setup();
+    systick_setup(125);
     tim2_setup();
     tim3_setup();
     resolution=1;
