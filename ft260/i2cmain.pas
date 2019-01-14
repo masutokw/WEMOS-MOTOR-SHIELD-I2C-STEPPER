@@ -4,36 +4,38 @@ interface
 
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
-  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, uLibFT260;
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, uLibFT260, Vcl.ExtCtrls,math;
 
 type
   TMain = class(TForm)
-    Button1: TButton;
+    Button_Check: TButton;
     Memo1: TMemo;
-    Button2: TButton;
-    Button3: TButton;
-    Button4: TButton;
-    Button5: TButton;
-    Button6: TButton;
     Button7: TButton;
-    Button8: TButton;
-    Button9: TButton;
+    Button_Set_Pos: TButton;
     Edit1: TEdit;
-    Button10: TButton;
-    Button11: TButton;
+    ButtonSpeed: TButton;
+    ButtonTarget: TButton;
     Edit2: TEdit;
+    Timer1: TTimer;
+    Label1: TLabel;
+    CheckBox_poll: TCheckBox;
+    Label2: TLabel;
+    Button_goto: TButton;
+    Button1: TButton;
+    Edit_hz: TEdit;
+    Buttonhz: TButton;
     procedure FormCreate(Sender: TObject);
-    procedure Button1Click(Sender: TObject);
-    procedure Button2Click(Sender: TObject);
-    procedure Button3Click(Sender: TObject);
-    procedure Button4Click(Sender: TObject);
-    procedure Button5Click(Sender: TObject);
-    procedure Button6Click(Sender: TObject);
+    procedure Button_CheckClick(Sender: TObject);
     procedure Button7Click(Sender: TObject);
-    procedure Button8Click(Sender: TObject);
-    procedure Button9Click(Sender: TObject);
-    procedure Button10Click(Sender: TObject);
-    procedure Button11Click(Sender: TObject);
+    procedure Button_Set_PosClick(Sender: TObject);
+    procedure ButtonSpeedClick(Sender: TObject);
+    procedure ButtonTargetClick(Sender: TObject);
+    procedure Timer1Timer(Sender: TObject);
+    procedure CheckBox_pollClick(Sender: TObject);
+    procedure Button_gotoClick(Sender: TObject);
+    procedure Button1Click(Sender: TObject);
+    procedure ButtonhzClick(Sender: TObject);
+
   private
     { Private declarations }
   public
@@ -42,10 +44,19 @@ type
 const
   initData1: array[0..1] of Byte = ( $F0,$55);
   initData2: array[0..1] of Byte = ($FB,$00 );
-  initData3: array[0..4] of Byte = (01,0,255,0,0);
-  NUNCHUK_ADDRESS:byte =$52;
-  PRESS_ADDRESS:byte=$77;
-  STM_ADDRESS=$32;
+  initData3: array[0..4] of Byte = (03,0,0,0,0);
+
+//Set Commands
+ MYSLAVE_SET_REG:byte= $01;
+//GET commands
+ MOTOR_GET_COUNT: byte= $02;
+ MOTOR_SET_COUNT:byte =$03;
+ MOTOR_SET_TARGET:byte =$04;
+ MOTOR_GET_TARGET:byte= $05;
+ MOTOR_SET_SPEED:byte= $06;
+ MOTOR_SET_DIR_RES= $07;
+ MOTOR_SET_SPEEDF=$0A;
+ STM_ADDRESS=$32;
 var
   Main: TMain;
   mhandle1: FT260_HANDLE;
@@ -55,34 +66,60 @@ var
   n_data:array[0..5] of byte;
    n3_data:array[0..4] of byte;
   count:DWORD;
+  pos,lastpos:integer;
 implementation
 
 {$R *.dfm}
 
+ function read_integer(cmd:byte;address:byte):integer;
+ var p:pointer;
+data:integer;
 
-procedure TMain.Button10Click(Sender: TObject);
-var p:^DWORD;
-speed:DWORD;
+begin
+data:=0;
+
+  ftStatus:=FT260_I2CMaster_Write (mhandle1, STM_ADDRESS,FT260_I2C_START_AND_STOP,@cmd,1,count) ;
+    // sleep(5);
+   ftStatus:=FT260_I2CMaster_Read (mhandle1,STM_ADDRESS ,FT260_I2C_START_AND_STOP,@data,4,count,50000) ;
+result:=data
+
+end;
+procedure set_float(cmd:byte;address:byte;value:single);
+var p:^single;
+  n_data:array[0..4] of byte;
+begin
+n_data[0]:=cmd;
+p:=@n_data[1];
+p^:=value;
+
+   FT260_I2CMaster_Write (mhandle1,address ,FT260_I2C_START_AND_STOP,@n_data,5,count) ;
+end;
+
+procedure set_integer(cmd:byte;address:byte;value:integer);
+var p:^integer;
+  n_data:array[0..4] of byte;
+begin
+n_data[0]:=cmd;
+p:=@n_data[1];
+p^:=value;
+   FT260_I2CMaster_Write (mhandle1,address ,FT260_I2C_START_AND_STOP,@n_data,5,count) ;
+end;
+procedure TMain.ButtonSpeedClick(Sender: TObject);
+
+var speed:integer;
 begin
 speed:=strtoint(Edit1.Text);
-n_data[0]:=6;
-p:=@n_data[1];
-p^:=speed;
-   FT260_I2CMaster_Write (mhandle1,STM_ADDRESS ,FT260_I2C_START_AND_STOP,@n_data,5,count) ;
+   set_integer(MOTOR_SET_SPEED,STM_ADDRESS,speed);
 end;
 
-procedure TMain.Button11Click(Sender: TObject);
-var p:^integer;
-speed:DWORD;
+procedure TMain.ButtonTargetClick(Sender: TObject);
+ var target:integer;
 begin
-speed:=strtoint(Edit2.Text);
-n_data[0]:=7;
-p:=@n_data[1];
-p^:=speed;
-   FT260_I2CMaster_Write (mhandle1,STM_ADDRESS ,FT260_I2C_START_AND_STOP,@n_data,5,count) ;
+   target:=strtoint(Edit2.Text);
+   set_integer( MOTOR_SET_TARGET,STM_ADDRESS,target);
 end;
 
-procedure TMain.Button1Click(Sender: TObject);
+procedure TMain.Button_CheckClick(Sender: TObject);
 
 var
 devNum : dword;
@@ -100,111 +137,68 @@ end;
 
 end;
 
-procedure TMain.Button2Click(Sender: TObject);
-var g :DWORD;
+
+
+
+
+
+
+
+procedure TMain.Button_gotoClick(Sender: TObject);
+var speed,sgn:integer;
 begin
+ sgn:=sign(strtoint(Edit2.Text)-pos );
+ if sgn<>0 then begin
+    speed:=abs(strtoint(Edit1.Text));
+    set_integer(MOTOR_SET_TARGET,STM_ADDRESS,strtoint(Edit2.Text));
 
-
-
-     FT260_I2CMaster_Write (mhandle1, NUNCHUK_ADDRESS,FT260_I2C_START_AND_STOP,@initData1,2,g) ;
-    ftStatus:= FT260_I2CMaster_Write (mhandle1, NUNCHUK_ADDRESS,FT260_I2C_START_AND_STOP,@initData2,2,g) ;
-     memo1.Lines.Add(IntToStr(dword(ftStatus)));
+   set_integer(MOTOR_SET_SPEED,STM_ADDRESS,speed*sgn);
+ end;
 end;
 
-procedure TMain.Button3Click(Sender: TObject);
-var snd,add:byte;
-w,g :DWORD;
-p:pointer;
-// mhandle1: FT260_HANDLE;
+procedure TMain.Button1Click(Sender: TObject);
 begin
-
-
-  FT260_I2CMaster_Write (mhandle1, NUNCHUK_ADDRESS,FT260_I2C_START_AND_STOP,@initData1,2,g) ;
-end;
-
-procedure TMain.Button4Click(Sender: TObject);
-var p:pointer;
-data:Dword;
-begin
-   ftStatus:=FT260_I2CMaster_Read (mhandle1, NUNCHUK_ADDRESS,FT260_I2C_START_AND_STOP,@n_data,6,count,5000) ;
-   memo1.Lines.Add(IntToStr(dword(ftStatus))+' ' +inttostr(count));
-end;
-
-procedure TMain.Button5Click(Sender: TObject);
-var p:pointer;
-data:word;
-cmd:byte;
-begin
-cmd:=$AA;
-   ftStatus:=FT260_I2CMaster_Write (mhandle1, PRESS_ADDRESS,FT260_I2C_START_AND_STOP,@cmd,1,count) ;
-   memo1.Lines.Add(IntToStr(dword(ftStatus))+' ' +inttostr(count));
-   FT260_I2CMaster_Read (mhandle1, PRESS_ADDRESS,FT260_I2C_START_AND_STOP,@data,2,count,5000) ;
-    memo1.Lines.Add(IntToStr(dword(ftStatus))+' ' +inttostr(data));
-end;
-
-procedure TMain.Button6Click(Sender: TObject);
-var p:pointer;
-data:word;
-cmd,addres:byte;
-begin
-cmd:=$05;
-  FT260_I2CMaster_Write (mhandle1, STM_ADDRESS,FT260_I2C_START_AND_STOP,@initData3,3,count) ;
-  ftStatus:=FT260_I2CMaster_Write (mhandle1, STM_ADDRESS,FT260_I2C_START_AND_STOP,@cmd,1,count) ;
- //for addres:=1 to 128 do begin
-   ftStatus:=FT260_I2CMaster_Read (mhandle1,STM_ADDRESS ,FT260_I2C_START_AND_STOP,@data,2,count,50000) ;
-    memo1.Lines.Add(IntToStr(dword(ftStatus))+' ' +inttostr(data)+'  '+inttostr(count));
- //end;
+     set_integer($44,STM_ADDRESS,0);
 end;
 
 procedure TMain.Button7Click(Sender: TObject);
-var p:pointer;
-cmd,addres:byte;
-data:integer;
+
 
 begin
-cmd:=$02;
-data:=0;
-//  FT260_I2CMaster_Write (mhandle1, STM_ADDRESS,FT260_I2C_START_AND_STOP,@initData3,5,count) ;
-  ftStatus:=FT260_I2CMaster_Write (mhandle1, STM_ADDRESS,FT260_I2C_START_AND_STOP,@cmd,1,count) ;
-     sleep(1);
-   ftStatus:=FT260_I2CMaster_Read (mhandle1,STM_ADDRESS ,FT260_I2C_START_AND_STOP,@data,4,count,50000) ;
-    memo1.Lines.Add(IntToStr(dword(ftStatus))+' ' +inttoHEX(data)+'  '+inttostr(data)+
+
+pos:=read_integer($2,STM_ADDRESS)  ;
+ label1.Caption:=inttostr(pos);
+    memo1.Lines.Add(IntToStr(dword(ftStatus))+' ' +inttoHEX(pos)+'  '+inttostr(pos)+
     ' '+inttostr(count));
 
-
 end;
 
-procedure TMain.Button8Click(Sender: TObject);
-var p:pointer;
-data:dword;
-cmd,addres:byte;
+procedure TMain.ButtonhzClick(Sender: TObject);
+var speed:single;
+ var p:^dword;
+ pos:dword;
 begin
-cmd:=$03;
-data:=0;
-  FT260_I2CMaster_Write (mhandle1, STM_ADDRESS,FT260_I2C_START_AND_STOP,@initData3,5,count) ;
-    sleep(50);
-  ftStatus:=FT260_I2CMaster_Write (mhandle1, STM_ADDRESS,FT260_I2C_START_AND_STOP,@cmd,1,count) ;
-    sleep(50);
- //   ftStatus:=FT260_I2CMaster_Read (mhandle1,STM_ADDRESS ,FT260_I2C_START_AND_STOP,@data,4,count,500) ;
- //   memo1.Lines.Add(IntToStr(dword(ftStatus))+' ' +inttoHEX(data)+'  '+inttostr(count));
+speed:=strtofloat(Edit_Hz.Text);
+
+            p:=@speed;
+            pos:=p^;
+    memo1.Lines.Add(inttoHEX(pos));
+
+   set_float(MOTOR_SET_SPEEDF,STM_ADDRESS,speed);
 end;
 
-procedure TMain.Button9Click(Sender: TObject);
-var p:pointer;
-cmd,addres:byte;
-data:Dword;
-
+procedure TMain.Button_Set_PosClick(Sender: TObject);
+ var pos:integer;
 begin
-cmd:=$02;
-data:=0;
-//  FT260_I2CMaster_Write (mhandle1, STM_ADDRESS,FT260_I2C_START_AND_STOP,@initData3,5,count) ;
-  ftStatus:=FT260_I2CMaster_Write (mhandle1, STM_ADDRESS,FT260_I2C_START_AND_STOP,@cmd,1,count) ;
-     sleep(150);
-   ftStatus:=FT260_I2CMaster_Read (mhandle1,STM_ADDRESS ,FT260_I2C_START_AND_STOP,@n3_data,4,count,500) ;
-    memo1.Lines.Add(IntToStr(dword(ftStatus))+' ' +inttoHEX(n3_data[0])+'  '+inttoHEX(n3_data[1])+'  '
-   +inttoHEX(n3_data[2])+'  '+inttoHEX(n3_data[3])+'  '+'  ' +inttostr(count));
-    FT260_I2CMaster_Reset(mhandle1);
+   pos:=strtoint(Edit2.Text);
+   set_integer(MOTOR_SET_COUNT,STM_ADDRESS,pos);
+end;
 
+
+
+procedure TMain.CheckBox_pollClick(Sender: TObject);
+begin
+timer1.Enabled:=checkbox_Poll.checked;
 end;
 
 procedure TMain.FormCreate(Sender: TObject);
@@ -216,6 +210,19 @@ procedure TMain.FormCreate(Sender: TObject);
 
 end;
 
+
+
+procedure TMain.Timer1Timer(Sender: TObject);
+
+
+begin
+
+pos:=read_integer( MOTOR_GET_COUNT,STM_ADDRESS)  ;
+
+ label1.Caption:='Position:'+inttostr(pos);
+ label2.Caption:='Speed:'+floattostr(1000.0*((pos-lastpos))/(timer1.Interval))+' mstp/s' ;
+ lastpos:=pos
+end;
 
 
 end.

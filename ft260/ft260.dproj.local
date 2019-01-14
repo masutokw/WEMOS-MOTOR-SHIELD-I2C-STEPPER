@@ -1,0 +1,15 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<BorlandProject>
+	<Transactions>
+    <Transaction>2018/01/19 15:20:07.000.166,=C:\Users\Angel\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2018/01/19 16:12:41.000.341,=C:\Users\Angel\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2018/01/23 22:18:51.000.441,=C:\Users\Angel\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2018/01/23 22:19:37.000.243,=C:\Users\Angel\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2018/09/21 12:41:00.000.622,=C:\Users\Angel\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2018/09/21 12:42:17.000.137,=C:\Users\Angel\Documents\Embarcadero\Studio\Projects\Unit2.pas</Transaction>
+    <Transaction>2018/09/21 12:44:18.000.554,C:\Users\Angel\Documents\Embarcadero\Studio\Projects\Unit2.pas=C:\Users\Angel\Documents\Embarcadero\Studio\Projects\ft260\uLibFT260.pas</Transaction>
+    <Transaction>2018/09/21 12:45:42.000.638,C:\Users\Angel\Documents\Embarcadero\Studio\Projects\Unit1.pas=C:\Users\Angel\Documents\Embarcadero\Studio\Projects\ft260\i2cmain.pas</Transaction>
+    <Transaction>2018/09/21 12:45:42.000.638,C:\Users\Angel\Documents\Embarcadero\Studio\Projects\Unit1.dfm=C:\Users\Angel\Documents\Embarcadero\Studio\Projects\ft260\i2cmain.dfm</Transaction>
+    <Transaction>2018/09/21 12:54:39.000.009,C:\Users\Angel\Documents\Embarcadero\Studio\Projects\Project1.dproj=C:\Users\Angel\Documents\Embarcadero\Studio\Projects\ft260\ft260.dproj</Transaction>
+  </Transactions>
+</BorlandProject>
