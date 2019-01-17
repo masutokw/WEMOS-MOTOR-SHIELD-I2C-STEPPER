@@ -5,13 +5,11 @@
 #include <libopencm3/cm3/systick.h>
 #include <libopencm3/stm32/i2c.h>
 #include <libopencm3/cm3/nvic.h>
-#include <libopencm3/stm32/exti.h>
 #include <string.h>
 #include <stdlib.h>
 #include "tb6621.h"
 #include "usart.h"
 #include "wave.h"
-#include <math.h>
 int32_t max_steps;
 volatile int32_t dir;
 uint32_t backslash=0;
@@ -20,8 +18,8 @@ volatile int32_t  speed;
 volatile int32_t position;
 volatile int32_t target=0x00FFFFFF;
 uint16_t delayt=50;
-uint32_t overticks_time2;
-uint32_t next_time2;
+uint8_t rep_counter;
+uint32_t next_time2,overticks_time2;;
 unsigned int ticks_x;
 float fspeed,fspeedt;
 //enum motor_state state;
@@ -44,35 +42,23 @@ inline int32_t sign(int32_t x)
 {
     return (x > 0) - (x < 0);
 }
+inline int32_t signf(float x)
+{
+    return (x > 0.0) - (x < 0.0);
+}
 static void gpio_setup(void)
 {
-
     gpio_mode_setup(GPIOA, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO0 |GPIO1|GPIO2 | GPIO3 | GPIO4);
-
-    /* Setup GPIO pins for USART transmitand I2c */
+    /* Setup GPIO pins for USART transmit and I2c */
     gpio_mode_setup(GPIOA, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO9 | GPIO7| GPIO6|GPIO10|GPIO2);
-
     /* Setup USART1 TX pin as alternate function. */
     gpio_set_af(GPIOA, GPIO_AF1,GPIO2);
     gpio_set_af(GPIOA, GPIO_AF1,GPIO6|GPIO7);
-
-}
-
-static void systick_setup(int xms)
-{
-
-	systick_set_clocksource(STK_CSR_CLKSOURCE_EXT);
-	STK_CVR = 0;//set to 0
-
-	systick_set_reload(rcc_ahb_frequency / 8 / 1000 * xms);
-	systick_counter_enable();
-	systick_interrupt_enable();
 }
 
 static void usart_setup(void)
 {
-
- // nvic_enable_irq(NVIC_USART1_IRQ);
+// nvic_enable_irq(NVIC_USART1_IRQ);
     usart_set_baudrate(USART1, 9600);
     usart_set_databits(USART1, 8);
     usart_set_parity(USART1, USART_PARITY_NONE);
@@ -92,7 +78,19 @@ static void clock_setup(void)
 
 }
 //Timer 2 doesn´t exist  officialy in STM32F030F4 but it is really there. OO
-static void tim2_setup(void)
+/*static void systick_setup(int xms)
+{
+    systick_set_clocksource(STK_CSR_CLKSOURCE_EXT);
+    STK_CVR = 0;//set to 0
+    systick_set_reload(rcc_ahb_frequency / 8 / 1000 * xms);
+    systick_counter_enable();
+    systick_interrupt_enable();
+}
+void sys_tick_handler(void)
+{
+    __asm__("NOP");	;
+}
+ static void tim2_setup(void)
 {
     rcc_periph_clock_enable(RCC_TIM2);
     nvic_enable_irq(NVIC_TIM2_IRQ);
@@ -106,6 +104,32 @@ static void tim2_setup(void)
     timer_enable_irq(TIM2, TIM_DIER_CC1IE);
 }
 
+void tim2_isr(void)
+{
+    if (timer_get_flag(TIM2, TIM_SR_CC1IF))
+    {
+        timer_clear_flag(TIM2, TIM_SR_CC1IF);
+        overticks_time2 = timer_get_counter(TIM2);
+        next_time2 = overticks_time2 + ticks_x;
+        timer_set_oc_value(TIM2, TIM_OC1, next_time2);
+        if (dir) move_mstep();
+    }
+}*/
+static void tim16_setup(void)
+{
+    rcc_periph_clock_enable(RCC_TIM16);
+    nvic_enable_irq(NVIC_TIM16_IRQ);
+    rcc_periph_reset_pulse(RST_TIM16);
+    timer_set_prescaler(TIM16,  tim2_prescaler);
+    TIM16_ARR = 0xFFFF;
+    timer_set_repetition_counter(TIM16, 0);
+    //timer_enable_preload(TIM16);
+    //timer_continuous_mode(TIM16);
+    timer_enable_update_event(TIM16);
+    timer_enable_counter(TIM16);
+    timer_enable_irq(TIM16,TIM_DIER_UIE);
+
+}
 
 static void i2c_setup(void)
 {
@@ -115,7 +139,6 @@ static void i2c_setup(void)
     // Setup GPIO Alternate function  /GPIO9 /GPIO10 on GPIO SDA SCL */
     gpio_mode_setup(GPIOA, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO9| GPIO10);
     gpio_set_af(GPIOA, GPIO_AF4, GPIO9 | GPIO10);
-
     i2c_reset(I2C1);
     i2c_peripheral_disable(I2C1);
     i2c_enable_analog_filter(I2C1);
@@ -129,19 +152,13 @@ static void i2c_setup(void)
     I2C1_OAR1|=I2C_OAR1_OA1EN_ENABLE;
     i2c_enable_interrupt(I2C1, I2C_CR1_ADDRIE|I2C_CR1_RXIE|I2C_CR1_TXIE|I2C_CR1_STOPIE|I2C_CR1_NACKIE);
     i2c_peripheral_enable(I2C1);
-
 }
 
-void tim2_isr(void)
+void tim16_isr(void)
 {
-    if (timer_get_flag(TIM2, TIM_SR_CC1IF))
+    if (timer_get_flag(TIM16, TIM_SR_UIF))
     {
-        timer_clear_flag(TIM2, TIM_SR_CC1IF);
-        overticks_time2 = timer_get_counter(TIM2);
-        // Calculate and set the next compare value.
-       // next_time2 = overticks_time2 + ticks_x;
-       next_time2 = overticks_time2 + ticks_x;
-        timer_set_oc_value(TIM2, TIM_OC1, next_time2);
+        timer_clear_flag(TIM16,  TIM_SR_UIF);
         if (dir) move_mstep();
     }
 }
@@ -150,7 +167,6 @@ void tim2_isr(void)
 static void tim3_setup(void)
 {
     TIM3_CR1 = TIM_CR1_CKD_CK_INT | TIM_CR1_CMS_EDGE;
-    //TIM3_ARR = 65535;
     TIM3_ARR = 512;
     // Prescaler
     TIM3_PSC = 0;
@@ -169,10 +185,7 @@ static void tim3_setup(void)
     TIM3_CR1 |= TIM_CR1_CEN;
 }
 
-void sys_tick_handler(void)
-{
- __asm__("NOP");	;
-}
+
 void move_mstep(void)
 {
     uint8_t p, s, j;
@@ -180,7 +193,8 @@ void move_mstep(void)
     if ((position == target)&&(dir!=0))
     {
         dir = 0;
-
+      //  set_speed(fspeedt);
+        target=0xFFFFEEEE;
     }
 
 
@@ -196,24 +210,11 @@ void move_mstep(void)
         else backcounter+= dir ;
     }
 
-
 #else
-
     position += dir;
 #endif // BACKSLASH_COMP
-
-
     ustep_index += dir;
-
-    /*   if (bit_is_clear(PINF, PF0) &&  (dir<0))
-       {
-
-           focus_aux.backcounter;
-            position=dir = home;
-
-       }
-       */
-    if ( ustep_index < 0)    ustep_index += MSTEPS4;
+    if ( ustep_index < 0) ustep_index += MSTEPS4;
     else if ( ustep_index >= MSTEPS4)  ustep_index -= MSTEPS4;
     s =  ustep_index >>MSTEPS_DIV;/// MSTEPS;
     j = MSTEPS - (p =  ustep_index % (MSTEPS));
@@ -224,12 +225,12 @@ void move_mstep(void)
         if (s == 1)
         {
             WA_P;
-            WB_N ;
+            WB_N
         }
         else
         {
-            WA_N;
-            WB_P;
+            WA_N
+            WB_P
         }
     }
     else
@@ -239,19 +240,47 @@ void move_mstep(void)
 
         if (s == 0)
         {
-            WA_P;
-            WB_P;
+            WA_P
+            WB_P
         }
         else
         {
-            WA_N;
-            WB_N;
+            WA_N
+            WB_N
         }
     }
     TIM3_CCR1=(pwmb);
     TIM3_CCR2=(pwma);
 }
+void set_period(int32_t speed)
+{
+    dir=sign(speed)*resolution;
+    ticks_x=abs(speed);
+    rep_counter=0;
+    if (ticks_x>0xFFFF)
+    {
+        rep_counter=ticks_x>>16;
+        ticks_x=ticks_x/(rep_counter+1);
+    }
+    TIM16_ARR =ticks_x;
+    TIM16_RCR=rep_counter;
 
+}
+void set_speed(float speed)
+{
+    dir=signf(speed)*resolution;
+
+    ticks_x=abs((int)(freq/(speed)));
+    rep_counter=0;
+    if (ticks_x>0xFFFF)
+    {
+        rep_counter=ticks_x>>16;
+        ticks_x=ticks_x/(rep_counter+1);
+    }
+   if (dir==0) ticks_x=0xFFFE;
+    TIM16_ARR = ticks_x;
+    TIM16_RCR=rep_counter;
+}
 
 void serialParse(uint8_t* cad)
 {
@@ -297,7 +326,7 @@ void i2c1_isr(void)
             i2cread=true;
             reading = 0;
             lpointer=(volatile int32_t *)(buf);
-            fpointer=(volatile float_t *)(buf);
+            fpointer=(volatile float *)(buf);
             I2C1_ISR|=I2C_ISR_TXE;
         }
 
@@ -338,7 +367,7 @@ void i2c1_isr(void)
             switch (cmd)
             {
             case MOTOR_GET_COUNT:
-                val =position;
+                val=position;
                 break;
             case MOTOR_SET_COUNT:
                 position =*lpointer;
@@ -350,29 +379,26 @@ void i2c1_isr(void)
                 val=target ;
                 break;
             case MOTOR_SET_TICKS:
-                speed=*lpointer;
-                dir=sign(speed)*resolution;
-                ticks_x=abs(speed)&0X0000FFFF;
+                set_period(speed=*lpointer);
                 break;
             case MOTOR_SET_DIR_RES:
                 resolution=abs(*lpointer);
                 break;
             case MOTOR_SET_PRESCALER:
-                tim2_prescaler=*lpointer;
-                timer_set_prescaler(TIM2, tim2_prescaler);
+                timer_set_prescaler(TIM2,tim2_prescaler=*lpointer);
                 freq=MAIN_CLOCK/tim2_prescaler;
                 break;
             case MOTOR_SET_WAVE_SCALE:
                 generate_wave(*lpointer);
                 break;
             case MOTOR_SET_SPEED:
-                 fspeed=*fpointer;
-                  dir=sign(fspeed)*resolution;
-                  ticks_x=(int)(freq/abs(fspeed));
-                                   break;
+                set_speed( fspeed=*fpointer);
+                break;
+            case  MOTOR_SET_TARGET_SPEED:
+                fspeedt=*fpointer;
+                break;
             case PRINT_WAVE:
                 bprint=true;
-
                 break;
             default:
                 break;
@@ -395,16 +421,16 @@ int main(void)
     gpio_setup();
     usart_setup();
     i2c_setup();
-    systick_setup(125);
-    tim2_setup();
+    //systick_setup(125); // tim2_setup();
+    tim16_setup();
     tim3_setup();
     resolution=1;
     gpio_set(GPIOA,GPIO0);
     gpio_set(GPIOA,GPIO3);
     gpio_clear(GPIOA,GPIO1);
     gpio_clear(GPIOA,GPIO4);
-    ticks_x=65500;
-    dir=0;
+    ticks_x=65535;
+    dir=01;
 
     while (1)
     {

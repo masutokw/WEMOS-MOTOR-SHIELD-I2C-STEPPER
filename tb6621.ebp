@@ -13,6 +13,7 @@
 				<Option type="0" />
 				<Option compiler="armgcc_eb" />
 				<Linker>
+					<Add option="-eb_use_mon" />
 					<Add option="-s" />
 				</Linker>
 			</Target>
@@ -21,6 +22,7 @@
 			<Add option="-std=c99" />
 			<Add option="-Wall" />
 			<Add option="-O1" />
+			<Add option="-g2" />
 			<Add option="-msoft-float" />
 			<Add option="-fcommon -mthumb" />
 			<Add option="-MD" />
