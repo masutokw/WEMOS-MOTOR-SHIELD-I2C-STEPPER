@@ -14,7 +14,7 @@ int32_t max_steps;
 volatile int32_t dir;
 uint32_t backslash=0;
 int32_t  backcounter=0;
-volatile int32_t  speed;
+volatile int32_t speed,speedt;
 volatile int32_t position;
 volatile int32_t target=0x00FFFFFF;
 uint16_t delayt=50;
@@ -189,7 +189,7 @@ static void tim3_setup(void)
 void move_mstep(void)
 {
     uint8_t p, s, j;
-    uint8_t  pwma, pwmb;
+    uint16_t  pwma, pwmb;
     if ((position == target)&&(dir!=0))
     {
         dir = 0;
@@ -252,10 +252,10 @@ void move_mstep(void)
     TIM3_CCR1=(pwmb);
     TIM3_CCR2=(pwma);
 }
-void set_period(int32_t speed)
+void set_period(int32_t period)
 {
-    dir=sign(speed)*resolution;
-    ticks_x=abs(speed);
+    dir=sign(period)*resolution;
+    ticks_x=abs(period);
     rep_counter=0;
     if (ticks_x>0xFFFF)
     {
@@ -416,7 +416,7 @@ int main(void)
 
 {
     int i;
-    generate_wave(24);
+    generate_wave(50);
     clock_setup();
     gpio_setup();
     usart_setup();
