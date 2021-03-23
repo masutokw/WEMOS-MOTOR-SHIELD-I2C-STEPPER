@@ -5,6 +5,7 @@
 #include <libopencm3/cm3/systick.h>
 #include <libopencm3/stm32/i2c.h>
 #include <libopencm3/cm3/nvic.h>
+#include <sys/param.h>
 #include <string.h>
 #include <stdlib.h>
 #include "tb6621.h"
@@ -70,6 +71,7 @@ static void usart_setup(void)
 
 static void clock_setup(void)
 {
+    //  rcc_clock_setup_in_hse_8mhz_out_48mhz();
     rcc_clock_setup_in_hsi_out_48mhz();
     rcc_periph_clock_enable(RCC_TIM3);
     rcc_periph_clock_enable(RCC_GPIOA);
@@ -184,20 +186,53 @@ static void tim3_setup(void)
     TIM3_CR1 |= TIM_CR1_ARPE;
     TIM3_CR1 |= TIM_CR1_CEN;
 }
+void speedup(void)
+{
+    int32_t delta,acc;
+    if (speed!= speedt)
+    { //dir=sign(speed);
+        delta =MIN(abs( speedt- speed),acc=abs(speed>>2));
+        //   delta =abs( speedt- speed);
+        if (delta==0) speed=speedt ;
+        else
 
+        {
+            if (sign(speed) == sign(speedt))
+            {
+
+                if (speed<speedt) speed+=delta;
+                else speed-=delta;
+            }
+            else
+            {
+                if (speed<speedt) speed-=delta;
+                else speed+=delta;
+                 if (abs(speed)>5000)speed=-speed;
+            }
+           // if (abs(speed)>5000)speed=-speed;
+        }
+
+
+
+
+        set_period(speed);
+    }
+}
 
 void move_mstep(void)
 {
     uint8_t p, s, j;
     uint16_t  pwma, pwmb;
+    speedup();
     if ((position == target)&&(dir!=0))
     {
         dir = 0;
-      //  set_speed(fspeedt);
-        target=0xFFFFEEEE;
+        //  set_speed(fspeedt);
+        target=0xF0000000;
+        return;
     }
 
-
+    //  speedup();
 #ifdef BACKSLASH_COMP
     if (dir<0)
     {
@@ -253,7 +288,7 @@ void move_mstep(void)
     TIM3_CCR2=(pwma);
 }
 void set_period(int32_t period)
-{
+{  if (period>10000000) dir=0; else
     dir=sign(period)*resolution;
     ticks_x=abs(period);
     rep_counter=0;
@@ -277,10 +312,11 @@ void set_speed(float speed)
         rep_counter=ticks_x>>16;
         ticks_x=ticks_x/(rep_counter+1);
     }
-   if (dir==0) ticks_x=0xFFFE;
+    if (dir==0) ticks_x=0xFFFE;
     TIM16_ARR = ticks_x;
     TIM16_RCR=rep_counter;
 }
+
 
 void serialParse(uint8_t* cad)
 {
@@ -392,10 +428,23 @@ void i2c1_isr(void)
                 generate_wave(*lpointer);
                 break;
             case MOTOR_SET_SPEED:
-                set_speed( fspeed=*fpointer);
+                fspeed=*fpointer;
+                speedt=speed=(int32_t)(freq/(fspeed));
+                set_period(speed);
+             //  set_speed(fspeed);
                 break;
             case  MOTOR_SET_TARGET_SPEED:
                 fspeedt=*fpointer;
+                speedt=(int32_t)(freq/(fspeedt));
+                break;
+            case MOTOR_GET_TARGET_SPEED:
+                val=speedt ;
+                break;
+            case MOTOR_GET_SPEED:
+                val=speed ;
+                break;
+             case MOTOR_GET_DIR_RES:
+                val=dir;
                 break;
             case PRINT_WAVE:
                 bprint=true;
@@ -412,11 +461,13 @@ void i2c1_isr(void)
 
     }
 }
+
+
 int main(void)
 
 {
     int i;
-    generate_wave(50);
+    generate_wave(60);
     clock_setup();
     gpio_setup();
     usart_setup();
@@ -430,8 +481,8 @@ int main(void)
     gpio_clear(GPIOA,GPIO1);
     gpio_clear(GPIOA,GPIO4);
     ticks_x=65535;
-    dir=01;
-
+    dir=0;
+    fspeed=fspeedt=0;
     while (1)
     {
         //debug table
