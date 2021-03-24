@@ -85,7 +85,7 @@ void loop() {
 
 //now we command back 0 pos
   target= 0;//set desired position 1000
- speed=-2000;//20,8 us * 300 =0.624s  ->-16,02 microsteps/s 
+ speedf=-2000;//20,8 us * 300 =0.624s  ->-16,02 microsteps/s 
  int32_t resolution=2; //motor will no run on 16 msteps 
  write_wms(MOTOR_SET_DIR_RES,SLAVE_ADDRESS_1,resolution);
  write_wms(MOTOR_SET_TARGET,SLAVE_ADDRESS_1,target);//target set
