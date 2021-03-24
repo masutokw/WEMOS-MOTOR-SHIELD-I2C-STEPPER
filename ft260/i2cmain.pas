@@ -24,6 +24,9 @@ type
     Button1: TButton;
     Edit_hz: TEdit;
     Buttonhz: TButton;
+    Edit3: TEdit;
+    Label3: TLabel;
+    Label4: TLabel;
     procedure FormCreate(Sender: TObject);
     procedure Button_CheckClick(Sender: TObject);
     procedure Button7Click(Sender: TObject);
@@ -35,6 +38,8 @@ type
     procedure Button_gotoClick(Sender: TObject);
     procedure Button1Click(Sender: TObject);
     procedure ButtonhzClick(Sender: TObject);
+    procedure set_speedf(speed:single);
+    procedure Button2Click(Sender: TObject);
 
   private
     { Private declarations }
@@ -53,9 +58,10 @@ const
  MOTOR_SET_COUNT:byte =$03;
  MOTOR_SET_TARGET:byte =$04;
  MOTOR_GET_TARGET:byte= $05;
- MOTOR_SET_SPEED:byte= $06;
+ MOTOR_SET_TICKS:byte= $06;
  MOTOR_SET_DIR_RES= $07;
- MOTOR_SET_SPEEDF=$0A;
+ MOTOR_SET_SPEED=$0a;
+MOTOR_SET_TARGET_SPEED=$0b;
  STM_ADDRESS=$32;
 var
   Main: TMain;
@@ -79,7 +85,7 @@ begin
 data:=0;
 
   ftStatus:=FT260_I2CMaster_Write (mhandle1, STM_ADDRESS,FT260_I2C_START_AND_STOP,@cmd,1,count) ;
-    // sleep(5);
+     sleep(5);
    ftStatus:=FT260_I2CMaster_Read (mhandle1,STM_ADDRESS ,FT260_I2C_START_AND_STOP,@data,4,count,50000) ;
 result:=data
 
@@ -109,7 +115,7 @@ procedure TMain.ButtonSpeedClick(Sender: TObject);
 var speed:integer;
 begin
 speed:=strtoint(Edit1.Text);
-   set_integer(MOTOR_SET_SPEED,STM_ADDRESS,speed);
+   set_integer(MOTOR_SET_TICKS,STM_ADDRESS,speed);
 end;
 
 procedure TMain.ButtonTargetClick(Sender: TObject);
@@ -145,14 +151,18 @@ end;
 
 
 procedure TMain.Button_gotoClick(Sender: TObject);
-var speed,sgn:integer;
+var speed:single;
+sgn,target:integer;
 begin
- sgn:=sign(strtoint(Edit2.Text)-pos );
+target:=strtoint(Edit2.Text);
+ sgn:=sign(target-pos );
+   memo1.Lines.Add(inttostr(target));
  if sgn<>0 then begin
-    speed:=abs(strtoint(Edit1.Text));
-    set_integer(MOTOR_SET_TARGET,STM_ADDRESS,strtoint(Edit2.Text));
 
-   set_integer(MOTOR_SET_SPEED,STM_ADDRESS,speed*sgn);
+    speed:=abs(strtofloat(Edit_hz.Text));
+    set_integer(MOTOR_SET_TARGET,STM_ADDRESS,target);
+    set_speedf(speed*sgn)  ;
+
  end;
 end;
 
@@ -161,19 +171,7 @@ begin
      set_integer($44,STM_ADDRESS,0);
 end;
 
-procedure TMain.Button7Click(Sender: TObject);
-
-
-begin
-
-pos:=read_integer($2,STM_ADDRESS)  ;
- label1.Caption:=inttostr(pos);
-    memo1.Lines.Add(IntToStr(dword(ftStatus))+' ' +inttoHEX(pos)+'  '+inttostr(pos)+
-    ' '+inttostr(count));
-
-end;
-
-procedure TMain.ButtonhzClick(Sender: TObject);
+procedure TMain.Button2Click(Sender: TObject);
 var speed:single;
  var p:^dword;
  pos:dword;
@@ -184,13 +182,53 @@ speed:=strtofloat(Edit_Hz.Text);
             pos:=p^;
     memo1.Lines.Add(inttoHEX(pos));
 
-   set_float(MOTOR_SET_SPEEDF,STM_ADDRESS,speed);
+   set_float(MOTOR_SET_TARGET_SPEED,STM_ADDRESS,speed);
 end;
+
+procedure TMain.Button7Click(Sender: TObject);
+  var pos:integer ;
+
+begin
+
+pos:=read_integer($D,STM_ADDRESS)  ;
+ label1.Caption:=inttostr(pos);
+    memo1.Lines.Add(IntToStr(dword(ftStatus))+' ' +inttoHEX(pos)+'  '+inttostr(pos)+
+    ' '+inttostr(count));
+
+pos:=read_integer($C,STM_ADDRESS)  ;
+ label1.Caption:=inttostr(pos);
+    memo1.Lines.Add(IntToStr(dword(ftStatus))+' ' +inttoHEX(pos)+'  '+inttostr(pos)+
+    ' '+inttostr(count));
+
+    pos:=read_integer($E,STM_ADDRESS)  ;
+ label1.Caption:=inttostr(pos);
+    memo1.Lines.Add(IntToStr(dword(ftStatus))+' ' +inttoHEX(pos)+'  '+inttostr(pos)+
+    ' '+inttostr(count));
+end;
+procedure TMain.set_speedf(speed:single);
+
+ var p:^dword;
+ pos:dword;
+begin
+
+            p:=@speed;
+            pos:=p^;
+    memo1.Lines.Add(inttoHEX(pos));
+    set_float(MOTOR_SET_SPEED,STM_ADDRESS,speed);
+end;
+procedure TMain.ButtonhzClick(Sender: TObject);
+var speed:single;
+
+begin
+speed:=strtofloat(Edit_Hz.Text);
+     set_speedf(speed);
+end;
+
 
 procedure TMain.Button_Set_PosClick(Sender: TObject);
  var pos:integer;
 begin
-   pos:=strtoint(Edit2.Text);
+   pos:=strtoint(Edit3.Text);
    set_integer(MOTOR_SET_COUNT,STM_ADDRESS,pos);
 end;
 

@@ -54,6 +54,7 @@
         <UWP_DelphiLogo44>$(BDS)\bin\Artwork\Windows\UWP\delphi_UwpDefault_44.png</UWP_DelphiLogo44>
         <UWP_DelphiLogo150>$(BDS)\bin\Artwork\Windows\UWP\delphi_UwpDefault_150.png</UWP_DelphiLogo150>
         <SanitizedProjectName>ft260</SanitizedProjectName>
+        <Custom_Styles>TabletDark|VCLSTYLE|$(BDSCOMMONDIR)\Styles\TabletDark.vsf</Custom_Styles>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win32)'!=''">
         <DCC_UsePackage>JvCustom;vcl;vclactnband;chart;JvXPCtrls;IndySystem;tethering;svnui;JvGlobus;JvPluginSystem;JvMM;vclimg;Jcl;vcltouch;JvCore;JvBands;vcldb;bindcompfmx;svn;JvCrypt;JvJans;JvNet;JvAppFrm;JvDlgs;JvRuntimeDesign;JvManagedThreads;fmx;fmxdae;xmlrtl;JvTimeFramework;fmxobj;vclwinx;rtl;JvWizards;Joystick;CustomIPTransport;vcldsnap;IndyCore;JvSystem;JvStdCtrls;vclx;pedits;bindcomp;appanalytics;dsnap;JvPageComps;bindcompvcl;JvDocking;JvPascalInterpreter;VclSmp;JclDeveloperTools;TA;JclVcl;vclie;CPortLibDXE;bindengine;JvCmp;JvHMI;dbrtl;IndyProtocols;JvControls;JvPrintPreview;JclContainers;fmxase;$(DCC_UsePackage)</DCC_UsePackage>
@@ -75,6 +76,8 @@
         <DCC_RemoteDebug>false</DCC_RemoteDebug>
         <AppEnableRuntimeThemes>true</AppEnableRuntimeThemes>
         <AppEnableHighDPI>true</AppEnableHighDPI>
+        <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
+        <VerInfo_Locale>1033</VerInfo_Locale>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2)'!=''">
         <DCC_LocalDebugSymbols>false</DCC_LocalDebugSymbols>
